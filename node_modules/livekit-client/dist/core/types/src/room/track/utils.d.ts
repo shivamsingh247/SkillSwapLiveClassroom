@@ -1,0 +1,20 @@
+import { TrackInfo, TrackPublishedResponse, TrackSource, VideoQuality } from '@livekit/protocol';
+import { Track } from './Track';
+import type { TrackPublication } from './TrackPublication';
+import { type AudioCaptureOptions, type CreateLocalTracksOptions, type VideoCaptureOptions, type VideoCodec } from './options';
+import type { AudioTrack } from './types';
+export declare function mergeDefaultOptions(options?: CreateLocalTracksOptions, audioDefaults?: AudioCaptureOptions, videoDefaults?: VideoCaptureOptions): CreateLocalTracksOptions;
+export declare function constraintsForOptions(options: CreateLocalTracksOptions): MediaStreamConstraints;
+/**
+ * This function detects silence on a given [[Track]] instance.
+ * Returns true if the track seems to be entirely silent.
+ */
+export declare function detectSilence(track: AudioTrack, timeOffset?: number): Promise<boolean>;
+export declare function mimeTypeToVideoCodecString(mimeType: string): VideoCodec;
+export declare function getTrackPublicationInfo<T extends TrackPublication>(tracks: T[]): TrackPublishedResponse[];
+export declare function getLogContextFromTrack(track: Track | TrackPublication): Record<string, unknown>;
+export declare function supportsSynchronizationSources(): boolean;
+export declare function diffAttributes(oldValues: Record<string, string> | undefined, newValues: Record<string, string> | undefined): Record<string, string>;
+export declare function getTrackSourceFromProto(source: TrackSource): Track.Source;
+export declare function areDimensionsSmaller(a: Track.Dimensions, b: Track.Dimensions): boolean;
+export declare function layerDimensionsFor(trackInfo: TrackInfo, quality: VideoQuality): Track.Dimensions | undefined;

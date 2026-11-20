@@ -1,0 +1,1 @@
+{"version":3,"file":"Room.d.ts","sourceRoot":"","sources":["../../../src/room/Room.ts"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,YAAY,CAAC;AAC9C,OAAO,EAAE,QAAQ,EAAE,MAAM,YAAY,CAAC;AAWtC,OAAO,EAAE,eAAe,EAAE,KAAK,kBAAkB,EAAE,MAAM,YAAY,CAAC;AAetE;;;;;;;GAOG;AACH,qBAAa,IAAK,SAAQ,QAAQ;IAChC;;;OAGG;gBACS,OAAO,CAAC,EAAE,WAAW;CAIlC;AAED,eAAe,IAAI,CAAC"}

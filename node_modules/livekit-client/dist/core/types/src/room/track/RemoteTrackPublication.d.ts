@@ -1,0 +1,76 @@
+import { SubscriptionError, TrackInfo } from '@livekit/protocol';
+import type { LoggerOptions } from '../types';
+import type RemoteTrack from './RemoteTrack';
+import { Track, VideoQuality } from './Track';
+import { TrackPublication } from './TrackPublication';
+export default class RemoteTrackPublication extends TrackPublication {
+    track?: RemoteTrack;
+    protected subscribed?: boolean;
+    protected requestedDisabled: boolean | undefined;
+    protected visible: boolean;
+    protected videoDimensionsAdaptiveStream?: Track.Dimensions;
+    protected requestedVideoDimensions?: Track.Dimensions;
+    protected requestedMaxQuality?: VideoQuality;
+    protected fps?: number;
+    protected subscriptionError?: SubscriptionError;
+    constructor(kind: Track.Kind, ti: TrackInfo, autoSubscribe: boolean | undefined, loggerOptions?: LoggerOptions);
+    /**
+     * Subscribe or unsubscribe to this remote track
+     * @param subscribed true to subscribe to a track, false to unsubscribe
+     */
+    setSubscribed(subscribed: boolean): void;
+    get subscriptionStatus(): TrackPublication.SubscriptionStatus;
+    get permissionStatus(): TrackPublication.PermissionStatus;
+    /**
+     * Returns true if track is subscribed, and ready for playback
+     */
+    get isSubscribed(): boolean;
+    get isDesired(): boolean;
+    get isEnabled(): boolean;
+    get isLocal(): boolean;
+    /**
+     * disable server from sending down data for this track. this is useful when
+     * the participant is off screen, you may disable streaming down their video
+     * to reduce bandwidth requirements
+     * @param enabled
+     */
+    setEnabled(enabled: boolean): void;
+    /**
+     * for tracks that support simulcasting, adjust subscribed quality
+     *
+     * This indicates the highest quality the client can accept. if network
+     * bandwidth does not allow, server will automatically reduce quality to
+     * optimize for uninterrupted video
+     */
+    setVideoQuality(quality: VideoQuality): void;
+    /**
+     * Explicitly set the video dimensions for this track.
+     *
+     * With adaptive stream, the SDK requests the smaller of these and the adaptive stream dimensions
+     * (by pixel count).
+     * It clears a quality that was requested with `setVideoQuality()`.
+     *
+     * @param dimensions The video dimensions to set.
+     */
+    setVideoDimensions(dimensions: Track.Dimensions): void;
+    setVideoFPS(fps: number): void;
+    /**
+     * The maximum video quality that was requested with `setVideoQuality()`.
+     * When no quality was requested, it is `VideoQuality.HIGH`. `setVideoDimensions()` clears the
+     * requested quality, so it is `VideoQuality.HIGH` after that call too.
+     *
+     * This value does not show the layer that the server sends. Adaptive stream and network
+     * bandwidth can make the server send a lower layer, and this value does not change.
+     *
+     * @see `RemoteVideoTrack.getReceiverStats()` (`frameWidth` and `frameHeight`) for the size of
+     * the video that the client receives.
+     */
+    get videoQuality(): VideoQuality | undefined;
+    private emitSubscriptionUpdateIfChanged;
+    private emitPermissionUpdateIfChanged;
+    private isManualOperationAllowed;
+    protected handleEnded: (track: RemoteTrack) => void;
+    protected get isAdaptiveStream(): boolean;
+    protected handleVisibilityChange: (visible: boolean) => void;
+    protected handleVideoDimensionsChange: (dimensions: Track.Dimensions) => void;
+}

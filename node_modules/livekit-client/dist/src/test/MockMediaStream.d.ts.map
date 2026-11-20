@@ -1,0 +1,1 @@
+{"version":3,"file":"MockMediaStream.d.ts","sourceRoot":"","sources":["../../../src/test/MockMediaStream.ts"],"names":[],"mappings":"AACA,MAAM,CAAC,OAAO,OAAO,eAAgB,SAAQ,WAAW;IACtD,QAAQ,CAAC,EAAE,EAAE,MAAM,CAAC;gBAER,EAAE,EAAE,MAAM,EAAE,MAAM,EAAE,gBAAgB,EAAE;IAKlD,SAAS,IAAI,gBAAgB,EAAE;CAGhC"}

@@ -1,0 +1,279 @@
+import {__awaiter,__asyncValues}from'tslib';import {DataStreamError,DataStreamErrorReason}from'../../errors.mjs';class BaseStreamReader {
+  get info() {
+    return this._info;
+  }
+  /** @internal */
+  validateBytesReceived() {
+    let doneReceiving = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+    if (typeof this.totalByteSize !== 'number' || this.totalByteSize === 0) {
+      return;
+    }
+    if (doneReceiving && this.bytesReceived < this.totalByteSize) {
+      throw new DataStreamError("Not enough chunk(s) received - expected ".concat(this.totalByteSize, " bytes of data total, only received ").concat(this.bytesReceived, " bytes"), DataStreamErrorReason.Incomplete);
+    } else if (this.bytesReceived > this.totalByteSize) {
+      throw new DataStreamError("Extra chunk(s) received - expected ".concat(this.totalByteSize, " bytes of data total, received ").concat(this.bytesReceived, " bytes"), DataStreamErrorReason.LengthExceeded);
+    }
+  }
+  constructor(info, stream, totalByteSize) {
+    this.reader = stream;
+    this.totalByteSize = totalByteSize;
+    this._info = info;
+    this.bytesReceived = 0;
+  }
+  /**
+   * Counts a chunk's bytes against `totalByteSize` and reports progress. Chunk ordering and
+   * de-duplication happen upstream in the manager's `ensureOrderedChunks`, so every chunk reaching
+   * here is new and in order.
+   */
+  handleChunkReceived(chunk) {
+    var _a;
+    this.bytesReceived += chunk.content.byteLength;
+    this.validateBytesReceived();
+    const currentProgress = this.totalByteSize ? this.bytesReceived / this.totalByteSize : undefined;
+    (_a = this.onProgress) === null || _a === void 0 ? void 0 : _a.call(this, currentProgress);
+  }
+}
+class ByteStreamReader extends BaseStreamReader {
+  [Symbol.asyncIterator]() {
+    const reader = this.reader.getReader();
+    // Suppress unhandled rejection on reader.closed — errors are
+    // already propagated through reader.read() to the consumer.
+    reader.closed.catch(() => {});
+    // Runs when iteration stops early (abort, `break`/`return`, or an error). The stream is
+    // cancelled rather than just unlocked, so the manager stops buffering chunks nobody will read
+    // and unregisters the stream - later packets for it are then dropped.
+    const cleanup = reason => {
+      // The stream may already be errored, in which case there is nothing left to cancel.
+      reader.cancel(reason).catch(() => {});
+      reader.releaseLock();
+      this.signal = undefined;
+    };
+    return {
+      next: () => __awaiter(this, void 0, void 0, function* () {
+        var _a;
+        try {
+          const signal = this.signal;
+          if (signal === null || signal === void 0 ? void 0 : signal.aborted) {
+            throw signal.reason;
+          }
+          const result = yield new Promise((resolve, reject) => {
+            if (signal) {
+              const onAbort = () => reject(signal.reason);
+              signal.addEventListener('abort', onAbort, {
+                once: true
+              });
+              reader.read().then(resolve, reject).finally(() => {
+                signal.removeEventListener('abort', onAbort);
+              });
+            } else {
+              reader.read().then(resolve, reject);
+            }
+          });
+          if (result.done) {
+            this.validateBytesReceived(true);
+            if (typeof this.totalByteSize === 'number') {
+              (_a = this.onProgress) === null || _a === void 0 ? void 0 : _a.call(this, 1);
+            }
+            return {
+              done: true,
+              value: undefined
+            };
+          } else {
+            this.handleChunkReceived(result.value);
+            return {
+              done: false,
+              value: result.value.content
+            };
+          }
+        } catch (err) {
+          cleanup(err);
+          throw err;
+        }
+      }),
+      // note: `return` runs only for premature exits, see:
+      // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#errors_during_iteration
+      return() {
+        return __awaiter(this, void 0, void 0, function* () {
+          cleanup();
+          return {
+            done: true,
+            value: undefined
+          };
+        });
+      }
+    };
+  }
+  /**
+   * Injects an AbortSignal, which if aborted, will terminate the currently active
+   * stream iteration operation.
+   *
+   * Note that when using AbortSignal.timeout(...), the timeout applies across
+   * the whole iteration operation, not just one individual chunk read.
+   */
+  withAbortSignal(signal) {
+    this.signal = signal;
+    return this;
+  }
+  readAll() {
+    return __awaiter(this, arguments, void 0, function () {
+      var _this = this;
+      let opts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      return function* () {
+        var _a, e_1, _b, _c;
+        let chunks = new Set();
+        const iterator = opts.signal ? _this.withAbortSignal(opts.signal) : _this;
+        try {
+          for (var _d = true, iterator_1 = __asyncValues(iterator), iterator_1_1; iterator_1_1 = yield iterator_1.next(), _a = iterator_1_1.done, !_a; _d = true) {
+            _c = iterator_1_1.value;
+            _d = false;
+            const chunk = _c;
+            chunks.add(chunk);
+          }
+        } catch (e_1_1) {
+          e_1 = {
+            error: e_1_1
+          };
+        } finally {
+          try {
+            if (!_d && !_a && (_b = iterator_1.return)) yield _b.call(iterator_1);
+          } finally {
+            if (e_1) throw e_1.error;
+          }
+        }
+        return Array.from(chunks);
+      }();
+    });
+  }
+}
+/**
+ * A class to read chunks from a ReadableStream and decode them as UTF-8 text.
+ *
+ * NOTE: chunk-level `version` (resending a chunk at an already-received `chunkIndex` to supersede
+ * it) is not supported. The reader used to rebuild the whole string from a per-index chunk map and
+ * yield it as `TextStreamChunk.collected`, which made superseding work; 5d4a6346 (#1410, text auto
+ * chunking) changed the iterator to yield each chunk's text as it arrives, and a streaming reader
+ * cannot retract text it has already handed to the consumer. No sender emits a versioned chunk.
+ */
+class TextStreamReader extends BaseStreamReader {
+  /**
+   * Async iterator implementation to allow usage of `for await...of` syntax.
+   * Yields each chunk's decoded text as it arrives - a delta, not the string accumulated so far.
+   */
+  [Symbol.asyncIterator]() {
+    const reader = this.reader.getReader();
+    // Suppress unhandled rejection on reader.closed — errors are
+    // already propagated through reader.read() to the consumer.
+    reader.closed.catch(() => {});
+    const decoder = new TextDecoder('utf-8');
+    const signal = this.signal;
+    // Runs when iteration stops early (abort, `break`/`return`, or an error). The stream is
+    // cancelled rather than just unlocked, so the manager stops buffering chunks nobody will read
+    // and unregisters the stream - later packets for it are then dropped.
+    const cleanup = reason => {
+      // The stream may already be errored, in which case there is nothing left to cancel.
+      reader.cancel(reason).catch(() => {});
+      reader.releaseLock();
+      this.signal = undefined;
+    };
+    return {
+      next: () => __awaiter(this, void 0, void 0, function* () {
+        var _a;
+        try {
+          if (signal === null || signal === void 0 ? void 0 : signal.aborted) {
+            throw signal.reason;
+          }
+          const result = yield new Promise((resolve, reject) => {
+            if (signal) {
+              const onAbort = () => reject(signal.reason);
+              signal.addEventListener('abort', onAbort, {
+                once: true
+              });
+              reader.read().then(resolve, reject).finally(() => {
+                signal.removeEventListener('abort', onAbort);
+              });
+            } else {
+              reader.read().then(resolve, reject);
+            }
+          });
+          if (result.done) {
+            this.validateBytesReceived(true);
+            if (typeof this.totalByteSize === 'number') {
+              (_a = this.onProgress) === null || _a === void 0 ? void 0 : _a.call(this, 1);
+            }
+            return {
+              done: true,
+              value: undefined
+            };
+          } else {
+            this.handleChunkReceived(result.value);
+            let decodedResult;
+            try {
+              decodedResult = decoder.decode(result.value.content);
+            } catch (err) {
+              throw new DataStreamError("Cannot decode datastream chunk ".concat(result.value.chunkIndex, " as text: ").concat(err), DataStreamErrorReason.DecodeFailed);
+            }
+            return {
+              done: false,
+              value: decodedResult
+            };
+          }
+        } catch (err) {
+          cleanup(err);
+          throw err;
+        }
+      }),
+      // note: `return` runs only for premature exits, see:
+      // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#errors_during_iteration
+      return() {
+        return __awaiter(this, void 0, void 0, function* () {
+          cleanup();
+          return {
+            done: true,
+            value: undefined
+          };
+        });
+      }
+    };
+  }
+  /**
+   * Injects an AbortSignal, which if aborted, will terminate the currently active
+   * stream iteration operation.
+   *
+   * Note that when using AbortSignal.timeout(...), the timeout applies across
+   * the whole iteration operation, not just one individual chunk read.
+   */
+  withAbortSignal(signal) {
+    this.signal = signal;
+    return this;
+  }
+  readAll() {
+    return __awaiter(this, arguments, void 0, function () {
+      var _this2 = this;
+      let opts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      return function* () {
+        var _a, e_2, _b, _c;
+        let finalString = '';
+        const iterator = opts.signal ? _this2.withAbortSignal(opts.signal) : _this2;
+        try {
+          for (var _d = true, iterator_2 = __asyncValues(iterator), iterator_2_1; iterator_2_1 = yield iterator_2.next(), _a = iterator_2_1.done, !_a; _d = true) {
+            _c = iterator_2_1.value;
+            _d = false;
+            const chunk = _c;
+            finalString += chunk;
+          }
+        } catch (e_2_1) {
+          e_2 = {
+            error: e_2_1
+          };
+        } finally {
+          try {
+            if (!_d && !_a && (_b = iterator_2.return)) yield _b.call(iterator_2);
+          } finally {
+            if (e_2) throw e_2.error;
+          }
+        }
+        return finalString;
+      }();
+    });
+  }
+}export{ByteStreamReader,TextStreamReader};//# sourceMappingURL=StreamReader.mjs.map

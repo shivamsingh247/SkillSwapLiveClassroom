@@ -1,0 +1,17 @@
+* { box-sizing: border-box; }
+html, body, #root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: #101827;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+.waiting {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 24px;
+}
+.waiting h1 { color: #62b6ff; }

@@ -1,0 +1,5 @@
+import { Checker } from './Checker';
+export declare class TURNCheck extends Checker {
+    get description(): string;
+    perform(): Promise<void>;
+}

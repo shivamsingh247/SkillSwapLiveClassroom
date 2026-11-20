@@ -1,0 +1,10 @@
+import { type Disposable, type SlotProvider } from '../room/extensions';
+import { FrameMetadataManager, type FrameMetadataOptions } from './FrameMetadataManager';
+/**
+ * Frame metadata extraction on subscribed video tracks (`frameMetadata` room option).
+ * Publishing frame metadata is part of the core publish path and needs no extension.
+ * @experimental
+ */
+export declare const frameMetadata: import("../exports").ConfigurableExtension<Partial<SlotProvider<"frameMetadataOptions">> & Disposable & {
+    manager: FrameMetadataManager;
+}, FrameMetadataOptions, readonly []>;
