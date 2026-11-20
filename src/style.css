@@ -15,3 +15,25 @@ html, body, #root {
   padding: 24px;
 }
 .waiting h1 { color: #62b6ff; }
+.teacher-controls {
+  position: relative;
+  z-index: 20;
+  padding: 10px 14px;
+  background: #17243a;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.control-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.control-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.teacher-controls small { color: #9fcaff; }
