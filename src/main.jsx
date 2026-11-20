@@ -9,16 +9,21 @@ import "@livekit/components-styles";
 import "./style.css";
 
 function App() {
-  const params = new URLSearchParams(window.location.hash.slice(1));
-  const token = params.get("token");
-  const serverUrl = params.get("server_url");
-  const roomName = params.get("room_name");
-  const authToken = params.get("auth_token");
-  const apiUrl = params.get("api_url");
-  const role = params.get("role");
+  const [session] = useState(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const result = {
+      token: params.get("token"),
+      serverUrl: params.get("server_url"),
+      roomName: params.get("room_name"),
+      authToken: params.get("auth_token"),
+      apiUrl: params.get("api_url"),
+      role: params.get("role")
+    };
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    return result;
+  });
 
-  // Remove sensitive tokens from the visible URL immediately.
-  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  const { token, serverUrl, roomName, authToken, apiUrl, role } = session;
 
   const [controls, setControls] = useState(null);
   const [controlStatus, setControlStatus] = useState("");
